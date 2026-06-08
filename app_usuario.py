@@ -1,8 +1,12 @@
 import streamlit as st
 import json
+from datetime import datetime
+import zoneinfo
 
+# Configuración limpia para pantallas de celular
 st.set_page_config(page_title="Quiniela Mundial 2026", layout="centered")
 
+# --- FUNCIONES PARA MANEJAR EL ALMACÉN ---
 def cargar_datos():
     with open("datos_quinela.json", "r", encoding="utf-8") as f:
         return json.load(f)
@@ -70,7 +74,7 @@ if st.session_state["usuario_logueado"] is None:
                     st.rerun()
             else: st.error("❌ Código inválido.")
 
-# --- PÁGINA PRINCIPAL DE JUEGO ---
+# --- PÁGINA PRINCIPAL DE JUEGO (SI YA LOGUEÓ) ---
 else:
     apodo_usuario = st.session_state["usuario_logueado"]
     
@@ -89,31 +93,65 @@ else:
     with pestana_juego:
         st.write("⚽ **Partido de Hoy:**")
         
-        # LEEMOS LOS NOMBRES QUE PUSO EL ADMINISTRADOR EN TIEMPO REAL
         equipo_local = datos["partido_actual"]["local"]
         equipo_visitante = datos["partido_actual"]["visitante"]
         
         st.subheader(f"🗓️ {equipo_local} vs {equipo_visitante}")
         
+        # --- CANDADO TEMPORAL ANTI-TRAMPAS ---
+        zona_mex = zoneinfo.ZoneInfo("America/Mexico_City")
+        hora_actual_mex = datetime.now(zona_mex)
+        # El partido inaugural inicia el Jueves 11 de Junio de 2026 a la 1:00 PM
+        hora_limite_partido = datetime(2026, 6, 11, 13, 0, 0, tzinfo=zona_mex)
+        partido_comenzado = hora_actual_mex >= hora_limite_partido
+
+        # Se deshabilitan las casillas si el juego ya arrancó
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown(f"**{equipo_local}**")
-            goles_local = st.number_input("Goles ", min_value=0, max_value=10, step=1, key="goles_l")
+            goles_local = st.number_input("Goles ", min_value=0, max_value=10, step=1, key="goles_l", disabled=partido_comenzado)
         with col2:
             st.markdown("<h3 style='text-align: center; margin-top: 25px;'>VS</h3>", unsafe_allow_html=True)
         with col3:
             st.markdown(f"**{equipo_visitante}**")
-            goles_vis = st.number_input("Goles  ", min_value=0, max_value=10, step=1, key="goles_v")
+            goles_vis = st.number_input("Goles  ", min_value=0, max_value=10, step=1, key="goles_v", disabled=partido_comenzado)
         
         st.divider()
-        if st.button("💾 Guardar mi Pronóstico", use_container_width=True):
-            datos = cargar_datos()
-            if "pronosticos" not in datos:
-                datos["pronosticos"] = {}
-            # Guardamos con etiquetas genéricas (local/visitante) para que funcione con cualquier partido
-            datos["pronosticos"][apodo_usuario] = {"local": goles_local, "visitante": goles_vis}
-            guardar_datos(datos)
-            st.success("¡Pronóstico guardado con éxito!")
+        
+        # --- LAS 4 REGLAS EXACTAS APROBADAS EN PANTALLA ---
+        st.write("🎯 **Selecciona tu condición de puntuación para este partido:**")
+        
+        # Menú desplegable interactivo para el celular
+        regla_seleccionada = st.selectbox(
+            "¿Qué resultado esperas acertar?",
+            [
+                "Acierto Empate SIN marcador exacto ➔ 1 Punto",
+                "Acierto Ganador SIN marcador exacto ➔ 3 Puntos",
+                "Acierto Empate CON marcador exacto ➔ 4 Puntos",
+                "Acierto Ganador CON marcador exacto ➔ 5 Puntos"
+            ],
+            disabled=partido_comenzado
+        )
+        
+        st.divider()
+        
+        if partido_comenzado:
+            st.error("🔒 El partido ya ha comenzado. El registro de pronósticos está oficialmente CERRADO.")
+        else:
+            if st.button("💾 Guardar mi Pronóstico", use_container_width=True):
+                datos = cargar_datos()
+                if "pronosticos" not in datos:
+                    datos["pronosticos"] = {}
+                
+                # Guardamos los goles y la regla específica seleccionada por tu amigo
+                datos["pronosticos"][apodo_usuario] = {
+                    "local": goles_local, 
+                    "visitante": goles_vis,
+                    "regla_usuario": regla_seleccionada
+                }
+                
+                guardar_datos(datos)
+                st.success("¡Tu pronóstico y tu regla han sido guardados con éxito!")
 
     with pestana_ranking:
         st.subheader("🔝 Top Jugadores del Mundial")
