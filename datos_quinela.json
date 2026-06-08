@@ -1,0 +1,17 @@
+{
+    "usuarios": {
+        "JOE5522": {
+            "password": "1234",
+            "puntos": 0,
+            "activo": true
+        }
+    },
+    "pronosticos": {},
+    "resultados_reales": {},
+    "codigos_registro": {
+        "MUN-NJGOX": {
+            "usado": true,
+            "por_usuario": "JOE5522"
+        }
+    }
+}
