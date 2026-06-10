@@ -109,7 +109,8 @@ with pestana_usuarios:
     if pendientes:
         st.warning(f"Tienes {len(pendientes)} usuario(s) esperando activación.")
         for usuario_p in pendientes:
-            col_user, col_btn_aprob = st.columns()
+            # 🛠️ SOLUCIÓN AL ERROR: st.columns(2) asignado de forma correcta
+            col_user, col_btn_aprob = st.columns(2)
             with col_user:
                 st.write(f"👤 **{usuario_p}**")
             with col_btn_aprob:
@@ -124,7 +125,6 @@ with pestana_usuarios:
     st.divider()
     
     st.subheader("📊 Ranking y Control de Accesos")
-    # 🛠️ SOLUCIÓN TOTAL AL ERROR DE LA LAMBDA: x[1]["puntos"] corregido
     usuarios_ordenados = sorted(datos["usuarios"].items(), key=lambda x: x[1]["puntos"], reverse=True)
     
     datos_tabla = [

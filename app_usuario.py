@@ -129,7 +129,6 @@ else:
         st.subheader("🔝 Top Jugadores del Mundial")
         datos = cargar_datos()
         
-        # 🛠️ SOLUCIÓN TOTAL AL ERROR DE LA LAMBDA: x[1]["puntos"] corregido
         usuarios_ordenados = sorted(datos["usuarios"].items(), key=lambda x: x[1]["puntos"], reverse=True)
         
         datos_tabla = [
@@ -138,3 +137,4 @@ else:
         ]
         if datos_tabla: st.table(datos_tabla)
         else: st.info("Aún no hay usuarios registrados.")
+
