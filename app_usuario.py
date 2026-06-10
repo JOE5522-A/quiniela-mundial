@@ -8,8 +8,22 @@ st.set_page_config(page_title="Quiniela Mundial 2026", layout="centered")
 
 # --- FUNCIONES PARA MANEJAR EL ALMACÉN ---
 def cargar_datos():
-    with open("datos_quinela.json", "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open("datos_quinela.json", "r", encoding="utf-8") as f:
+            datos = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        datos = {}
+    
+    # Asegurar estructuras básicas
+    if "partido_actual" not in datos:
+        datos["partido_actual"] = {"local": "México", "visitante": "Sudáfrica", "estado": "activo"}
+    if "usuarios" not in datos:
+        datos["usuarios"] = {}
+    if "codigos_registro" not in datos:
+        datos["codigos_registro"] = {}
+    if "pronosticos" not in datos:
+        datos["pronosticos"] = {}
+    return datos
 
 def guardar_datos(datos):
     with open("datos_quinela.json", "w", encoding="utf-8") as f:
@@ -17,12 +31,10 @@ def guardar_datos(datos):
 
 datos = cargar_datos()
 
-if "partido_actual" not in datos:
-    datos["partido_actual"] = {"local": "México", "visitante": "Sudáfrica"}
-
 st.title("🏆 Mi Quiniela Web")
 
 parametros = st.query_params
+# Corrección en el método get para evitar errores de tipo de dato
 codigo_desde_enlace = parametros.get("invitacion", "")
 
 if "usuario_logueado" not in st.session_state:
@@ -34,7 +46,7 @@ if st.session_state["usuario_logueado"] is None:
     
     if modo_acceso == "🔑 Iniciar Sesión":
         st.subheader("Entrar a mi Cuenta")
-        apodo_ingresado = st.text_input("Apodo de usuario:")
+        apodo_ingresado = st.text_input("Apodo de usuario:").strip()
         password_ingresado = st.text_input("Contraseña:", type="password")
         if st.button("🚪 Entrar", use_container_width=True):
             if apodo_ingresado in datos["usuarios"]:
@@ -47,12 +59,13 @@ if st.session_state["usuario_logueado"] is None:
     elif modo_acceso == "📝 Registrarme por primera vez":
         st.subheader("Crear Cuenta de Invitado")
         codigo_sucio = st.text_input("Código de Invitación:", value=codigo_desde_enlace)
+        
         if "?invitacion=" in codigo_sucio:
             codigo_ticket = codigo_sucio.split("?invitacion=")[-1].strip().upper()
         else:
             codigo_ticket = codigo_sucio.strip().upper()
         
-        nuevo_apodo = st.text_input("Inventa tu Apodo Público:")
+        nuevo_apodo = st.text_input("Inventa tu Apodo Público:").strip()
         nuevo_password = st.text_input("Inventa tu Contraseña Secreta:", type="password")
         
         if st.button("🚀 Crear mi Cuenta y Jugar", use_container_width=True):
@@ -98,63 +111,68 @@ else:
         
         st.subheader(f"🗓️ {equipo_local} vs {equipo_visitante}")
         
-        # --- CANDADO TEMPORAL ANTI-TRAMPAS ---
+        # 🛡️ MEJORA: El candado ahora se activa por el Admin o si pasó la fecha inaugural
         zona_mex = zoneinfo.ZoneInfo("America/Mexico_City")
         hora_actual_mex = datetime.now(zona_mex)
-        # El partido inaugural inicia el Jueves 11 de Junio de 2026 a la 1:00 PM
         hora_limite_partido = datetime(2026, 6, 11, 13, 0, 0, tzinfo=zona_mex)
-        partido_comenzado = hora_actual_mex >= hora_limite_partido
+        
+        # Se bloquea si el admin marcó 'finalizado' o si pasó la hora del primer juego
+        partido_comenzado = (datos["partido_actual"].get("estado") == "finalizado") or (hora_actual_mex >= hora_limite_partido)
 
-        # Se deshabilitan las casillas si el juego ya arrancó
+        # Cargar valores guardados previamente por el usuario para que no aparezcan en 0 siempre
+        pronostico_previo = datos.get("pronosticos", {}).get(apodo_usuario, {"local": 0, "visitante": 0})
+
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown(f"**{equipo_local}**")
-            goles_local = st.number_input("Goles ", min_value=0, max_value=10, step=1, key="goles_l", disabled=partido_comenzado)
+            goles_local = st.number_input("Goles ", min_value=0, max_value=10, step=1, key="goles_l", value=int(pronostico_previo["local"]), disabled=partido_comenzado)
         with col2:
             st.markdown("<h3 style='text-align: center; margin-top: 25px;'>VS</h3>", unsafe_allow_html=True)
         with col3:
             st.markdown(f"**{equipo_visitante}**")
-            goles_vis = st.number_input("Goles  ", min_value=0, max_value=10, step=1, key="goles_v", disabled=partido_comenzado)
+            goles_vis = st.number_input("Goles  ", min_value=0, max_value=10, step=1, key="goles_v", value=int(pronostico_previo["visitante"]), disabled=partido_comenzado)
         
         st.divider()
         
-        # --- LAS 4 REGLAS EXACTAS APROBADAS EN PANTALLA ---
-        st.write("🎯 **Selecciona tu condición de puntuación para este partido:**")
-        
-        # Menú desplegable interactivo para el celular
-        regla_seleccionada = st.selectbox(
-            "¿Qué resultado esperas acertar?",
-            [
-                "Acierto Empate SIN marcador exacto ➔ 1 Punto",
-                "Acierto Ganador SIN marcador exacto ➔ 3 Puntos",
-                "Acierto Empate CON marcador exacto ➔ 4 Puntos",
-                "Acierto Ganador CON marcador exacto ➔ 5 Puntos"
-            ],
-            disabled=partido_comenzado
-        )
-        
-        st.divider()
+        # --- TABLA INFORMATIVA DE REGLAS DE PUNTOS ---
+        with st.expander("🎯 Ver Sistema de Puntuación Oficial"):
+            st.markdown("""
+            * **1 Punto:** Acertar Empate sin marcador exacto.
+            * **3 Puntos:** Acertar Ganador sin marcador exacto.
+            * **4 Puntos:** Acertar Empate CON marcador exacto.
+            * **5 Puntos:** Acertar Ganador CON marcador exacto.
+            """)
         
         if partido_comenzado:
-            st.error("🔒 El partido ya ha comenzado. El registro de pronósticos está oficialmente CERRADO.")
+            st.error("🔒 Los pronósticos para este encuentro están oficialmente CERRADOS.")
         else:
             if st.button("💾 Guardar mi Pronóstico", use_container_width=True):
                 datos = cargar_datos()
-                if "pronosticos" not in datos:
-                    datos["pronosticos"] = {}
                 
-                # Guardamos los goles y la regla específica seleccionada por tu amigo
                 datos["pronosticos"][apodo_usuario] = {
                     "local": goles_local, 
-                    "visitante": goles_vis,
-                    "regla_usuario": regla_seleccionada
+                    "visitante": goles_vis
                 }
                 
                 guardar_datos(datos)
-                st.success("¡Tu pronóstico y tu regla han sido guardados con éxito!")
+                st.success("¡Tu pronóstico ha sido guardados con éxito!")
 
     with pestana_ranking:
         st.subheader("🔝 Top Jugadores del Mundial")
         datos = cargar_datos()
-        datos_tabla = [{"Posición": f"{i}º", "Apodo": user, "Puntos": info["puntos"]} for i, (user, info) in enumerate(datos["usuarios"].items(), 1)]
-        st.table(datos_tabla)
+        
+        # 📊 MEJORA: Ordenamos la lista de usuarios de mayor a menor puntaje antes de mostrar la tabla
+        usuarios_ordenados = sorted(datos["usuarios"].items(), key=lambda x: x[1]["puntos"], reverse=True)
+        
+        datos_tabla = [
+            {
+                "Posición": f"{i}º", 
+                "Apodo": user, 
+                "Puntos Total": info["puntos"]
+            } for i, (user, info) in enumerate(usuarios_ordenados, 1)
+        ]
+        
+        if datos_tabla:
+            st.table(datos_tabla)
+        else:
+            st.info("Aún no hay usuarios registrados en la tabla.")
