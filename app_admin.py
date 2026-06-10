@@ -13,7 +13,6 @@ def cargar_datos():
     except (FileNotFoundError, json.JSONDecodeError):
         datos = {}
     
-    # Asegura la consistencia de las estructuras
     if "partido_actual" not in datos:
         datos["partido_actual"] = {"local": "México", "visitante": "Sudáfrica", "estado": "activo"}
     if "codigos_registro" not in datos:
@@ -24,7 +23,6 @@ def cargar_datos():
         datos["pronosticos"] = {}
     if "historial_partidos" not in datos:
         datos["historial_partidos"] = []
-        
     return datos
 
 def guardar_datos(datos):
@@ -43,12 +41,10 @@ def calcular_puntos(gol_u_local, gol_u_vis, gol_r_local, gol_r_vis):
     else:
         return 0
 
-# Inicialización
 datos = cargar_datos()
 
 st.title("⚙️ Panel de Control - Administrador")
 
-# Creamos las 3 pestañas solicitadas
 pestana_partidos, pestana_invitaciones, pestana_usuarios = st.tabs([
     "⚽ Partidos del Día", 
     "🎫 Generar Invitaciones",
@@ -60,7 +56,7 @@ with pestana_partidos:
     st.subheader("📌 Configurar Partido Activo")
     
     if datos["partido_actual"].get("estado") == "finalizado":
-        st.warning("⚠️ El partido anterior ya fue cerrado y evaluado. Configura el nuevo juego de hoy abajo.")
+        st.warning("⚠️ El partido anterior ya fue cerrado. Configura el nuevo juego abajo.")
     else:
         st.info(f"⚽ Partido activo: **{datos['partido_actual']['local']} vs {datos['partido_actual']['visitante']}**")
     
@@ -69,14 +65,14 @@ with pestana_partidos:
     
     if st.button("📢 Cambiar Partido del Día", use_container_width=True):
         if datos["partido_actual"].get("estado") == "activo" and len(datos.get("pronosticos", {})) > 0:
-            st.error("❌ Hay pronósticos activos. Finaliza el partido actual y suma los puntos antes de cambiar los equipos.")
+            st.error("❌ Hay pronósticos activos. Finaliza el partido actual antes de cambiar los equipos.")
         elif nuevo_local.strip() == "" or nuevo_visitante.strip() == "":
-            st.error("❌ Los nombres de los equipos no pueden estar vacíos.")
+            st.error("❌ Los nombres no pueden estar vacíos.")
         else:
             datos["partido_actual"] = {"local": nuevo_local, "visitante": nuevo_visitante, "estado": "activo"}
             datos["pronosticos"] = {} 
             guardar_datos(datos)
-            st.success(f"¡Activado! Celulares sincronizados con: {nuevo_local} vs {nuevo_visitante}")
+            st.success("¡Partido cambiado con éxito!")
             st.rerun()
 
     st.divider()
@@ -87,19 +83,16 @@ with pestana_partidos:
     else:
         st.write(f"Introduce el resultado final de: **{datos['partido_actual']['local']} vs {datos['partido_actual']['visitante']}**")
         col1, col2 = st.columns(2)
-        with col1:
-            gol_r_local = st.number_input(f"Goles {datos['partido_actual']['local']}", min_value=0, max_value=20, step=1, key="gl")
-        with col2:
-            gol_r_vis = st.number_input(f"Goles {datos['partido_actual']['visitante']}", min_value=0, max_value=20, step=1, key="gv")
+        with col1: gol_r_local = st.number_input(f"Goles {datos['partido_actual']['local']}", min_value=0, step=1, key="gl")
+        with col2: gol_r_vis = st.number_input(f"Goles {datos['partido_actual']['visitante']}", min_value=0, step=1, key="gv")
             
         if st.button("🧠 Finalizar Partido y Calcular Puntos", use_container_width=True):
             conteo_procesados = 0
             for apodo, pronostico in datos.get("pronosticos", {}).items():
-                if apodo in datos["usuarios"]:
-                    if datos["usuarios"][apodo].get("activo", True):
-                        nuevos_puntos = calcular_puntos(pronostico["local"], pronostico["visitante"], gol_r_local, gol_r_vis)
-                        datos["usuarios"][apodo]["puntos"] += nuevos_puntos
-                        conteo_procesados += 1
+                if apodo in datos["usuarios"] and datos["usuarios"][apodo].get("activo", True):
+                    nuevos_puntos = calcular_puntos(pronostico["local"], pronostico["visitante"], gol_r_local, gol_r_vis)
+                    datos["usuarios"][apodo]["puntos"] += nuevos_puntos
+                    conteo_procesados += 1
             
             datos["historial_partidos"].append({
                 "local": datos["partido_actual"]["local"], "visitante": datos["partido_actual"]["visitante"],
@@ -107,7 +100,7 @@ with pestana_partidos:
             })
             datos["partido_actual"]["estado"] = "finalizado"
             guardar_datos(datos)
-            st.success(f"⚽ ¡Cerrado! {datos['partido_actual']['local']} {gol_r_local} - {gol_r_vis} {datos['partido_actual']['visitante']}.")
+            st.success(f"⚽ ¡Cerrado! Marcador cargado para {conteo_procesados} usuarios.")
             st.rerun()
 
 # --- PESTAÑA 2: GENERAR INVITACIONES ---
@@ -124,42 +117,29 @@ with pestana_invitaciones:
 # --- PESTAÑA 3: GESTIÓN DE USUARIOS Y RANKING ---
 with pestana_usuarios:
     st.subheader("📊 Tabla de Posiciones General")
-    usuarios_ordenados = sorted(datos["usuarios"].items(), key=lambda x: x["puntos"], reverse=True)
+    # 🔥 SOLUCIÓN DEFINITIVA AL TYPEERROR (Uso correcto de x[1]['puntos'])
+    usuarios_ordenados = sorted(datos["usuarios"].items(), key=lambda x: x[1]["puntos"], reverse=True)
     
     datos_tabla = [
-        {
-            "Posición": f"{i}º",
-            "Apodo": apodo,
-            "Puntos acumulados": info["puntos"],
-            "Estado de Cuenta": "🟢 Activo" if info.get("activo", True) else "🔴 Suspendido"
-        }
+        {"Posición": f"{i}º", "Apodo": apodo, "Puntos": info["puntos"], "Estado": "🟢 Activo" if info.get("activo", True) else "🔴 Suspendido"}
         for i, (apodo, info) in enumerate(usuarios_ordenados, 1)
     ]
-    
-    if datos_tabla:
-        st.table(datos_tabla)
-    else:
-        st.info("Aún no se han registrado usuarios en el sistema.")
+    if datos_tabla: st.table(datos_tabla)
+    else: st.info("No hay usuarios registrados.")
         
     st.divider()
-    
     st.subheader("🚫 Control de Accesos (Suspender / Activar Amigos)")
     if datos["usuarios"]:
-        lista_jugadores = list(datos["usuarios"].keys())
-        usuario_seleccionado = st.selectbox("Selecciona un usuario:", lista_jugadores)
+        usuario_seleccionado = st.selectbox("Selecciona un usuario:", list(datos["usuarios"].keys()))
         estado_actual = datos["usuarios"][usuario_seleccionado].get("activo", True)
         
         if estado_actual:
-            st.success(f"El usuario **{usuario_seleccionado}** tiene acceso total.")
             if st.button(f"🔒 Suspender a {usuario_seleccionado}", use_container_width=True, type="primary"):
                 datos["usuarios"][usuario_seleccionado]["activo"] = False
                 guardar_datos(datos)
                 st.rerun()
         else:
-            st.error(f"El usuario **{usuario_seleccionado}** se encuentra SUSPENDIDO.")
             if st.button(f"🔓 Reactivar a {usuario_seleccionado}", use_container_width=True):
                 datos["usuarios"][usuario_seleccionado]["activo"] = True
                 guardar_datos(datos)
                 st.rerun()
-    else:
-        st.info("No hay perfiles para administrar.")
