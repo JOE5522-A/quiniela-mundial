@@ -61,7 +61,6 @@ if st.session_state["usuario_logueado"] is None:
             elif nuevo_apodo == "" or nuevo_password == "":
                 st.error("⚠️ Rellena todos los campos.")
             else:
-                # ⏳ Se registra en falso (False = Inactivo / Esperando aprobación)
                 datos["usuarios"][nuevo_apodo] = {"password": nuevo_password, "puntos": 0, "activo": False}
                 guardar_datos(datos)
                 st.success("🎉 ¡Cuenta creada con éxito! Dile al Administrador que te active para empezar a enviar pronósticos.")
@@ -70,7 +69,6 @@ if st.session_state["usuario_logueado"] is None:
 # --- PÁGINA PRINCIPAL DE JUEGO (LOGUEADO) ---
 else:
     apodo_usuario = st.session_state["usuario_logueado"]
-    # Validamos si está activo real en la base de datos
     cuenta_aprobada = datos["usuarios"][apodo_usuario].get("activo", False)
     
     col_inf, col_btn = st.columns(2)
@@ -93,7 +91,6 @@ else:
         zona_mex = zoneinfo.ZoneInfo("America/Mexico_City")
         partido_comenzado = (datos["partido_actual"].get("estado") == "finalizado") or (datetime.now(zona_mex) >= datetime(2026, 6, 11, 13, 0, 0, tzinfo=zona_mex))
 
-        # 🔒 CANDADO ADICIONAL DE APROBACIÓN: Si no está aprobado por el admin, se le bloquea todo
         bloqueo_total = partido_comenzado or (not cuenta_aprobada)
 
         pronostico_previo = datos.get("pronosticos", {}).get(apodo_usuario, {"local": 0, "visitante": 0})
@@ -132,7 +129,8 @@ else:
         st.subheader("🔝 Top Jugadores del Mundial")
         datos = cargar_datos()
         
-        usuarios_ordenados = sorted(datos["usuarios"].items(), key=lambda x: x["puntos"], reverse=True)
+        # 🛠️ SOLUCIÓN TOTAL AL ERROR DE LA LAMBDA: x[1]["puntos"] corregido
+        usuarios_ordenados = sorted(datos["usuarios"].items(), key=lambda x: x[1]["puntos"], reverse=True)
         
         datos_tabla = [
             {"Posición": f"{i}º", "Apodo": user, "Puntos Total": info["puntos"]} 
