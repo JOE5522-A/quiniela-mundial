@@ -64,7 +64,7 @@ if st.session_state["usuario_logueado"] is None:
                 datos["usuarios"][nuevo_apodo] = {"password": nuevo_password, "puntos": 0, "activo": False}
                 guardar_datos(datos)
                 st.success("🎉 ¡Cuenta creada con éxito! Dile al Administrador que te active para empezar a enviar pronósticos.")
-                st.info("Ya puedes iniciar sesión para ver la tabla de posiciones mientras esperas tu activación.")
+                st.rerun()
 
 # --- PÁGINA PRINCIPAL DE JUEGO (LOGUEADO) ---
 else:

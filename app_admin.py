@@ -104,12 +104,16 @@ with pestana_partidos:
 # --- PESTAÑA 2: GESTIÓN Y APROBACIÓN DE USUARIOS ---
 with pestana_usuarios:
     st.subheader("⏳ Jugadores Pendientes de Aprobación")
-    pendientes = [apodo for apodo, info in datos["usuarios"].items() if info.get("activo", False) == False]
+    
+    # Forzar verificación de que "activo" exista como llave en cada perfil
+    pendientes = []
+    for apodo, info in datos["usuarios"].items():
+        if info.get("activo", False) == False:
+            pendientes.append(apodo)
     
     if pendientes:
         st.warning(f"Tienes {len(pendientes)} usuario(s) esperando activación.")
         for usuario_p in pendientes:
-            # 🛠️ SOLUCIÓN AL ERROR: st.columns(2) asignado de forma correcta
             col_user, col_btn_aprob = st.columns(2)
             with col_user:
                 st.write(f"👤 **{usuario_p}**")
