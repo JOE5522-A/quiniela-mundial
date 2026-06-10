@@ -14,7 +14,7 @@ def cargar_datos():
     except (FileNotFoundError, json.JSONDecodeError):
         datos = {}
     
-    # Asegurar estructuras básicas
+    # Asegurar estructuras básicas y evitar errores de llaves inexistentes
     if "partido_actual" not in datos:
         datos["partido_actual"] = {"local": "México", "visitante": "Sudáfrica", "estado": "activo"}
     if "usuarios" not in datos:
@@ -29,18 +29,19 @@ def guardar_datos(datos):
     with open("datos_quinela.json", "w", encoding="utf-8") as f:
         json.dump(datos, f, indent=4, ensure_ascii=False)
 
+# Cargar los datos al iniciar la app
 datos = cargar_datos()
 
 st.title("🏆 Mi Quiniela Web")
 
+# Captura de parámetros desde el enlace de WhatsApp
 parametros = st.query_params
-# Corrección en el método get para evitar errores de tipo de dato
 codigo_desde_enlace = parametros.get("invitacion", "")
 
 if "usuario_logueado" not in st.session_state:
     st.session_state["usuario_logueado"] = None
 
-# --- INICIO DE SESIÓN Y REGISTRO ---
+# --- SECCIÓN 1: INICIO DE SESIÓN Y REGISTRO ---
 if st.session_state["usuario_logueado"] is None:
     modo_acceso = st.radio("Elige una opción:", ["🔑 Iniciar Sesión", "📝 Registrarme por primera vez"], horizontal=True)
     
@@ -48,13 +49,19 @@ if st.session_state["usuario_logueado"] is None:
         st.subheader("Entrar a mi Cuenta")
         apodo_ingresado = st.text_input("Apodo de usuario:").strip()
         password_ingresado = st.text_input("Contraseña:", type="password")
+        
         if st.button("🚪 Entrar", use_container_width=True):
             if apodo_ingresado in datos["usuarios"]:
-                if password_ingresado == datos["usuarios"][apodo_ingresado]["password"]:
+                # 🔒 Validación de cuenta suspendida por el administrador
+                if not datos["usuarios"][apodo_ingresado].get("activo", True):
+                    st.error("❌ Tu cuenta se encuentra suspendida temporalmente por el Administrador.")
+                elif password_ingresado == datos["usuarios"][apodo_ingresado]["password"]:
                     st.session_state["usuario_logueado"] = apodo_ingresado
                     st.rerun()
-                else: st.error("❌ Contraseña incorrecta.")
-            else: st.error("❌ El apodo no existe.")
+                else: 
+                    st.error("❌ Contraseña incorrecta.")
+            else: 
+                st.error("❌ El apodo no existe.")
 
     elif modo_acceso == "📝 Registrarme por primera vez":
         st.subheader("Crear Cuenta de Invitado")
@@ -69,7 +76,7 @@ if st.session_state["usuario_logueado"] is None:
         nuevo_password = st.text_input("Inventa tu Contraseña Secreta:", type="password")
         
         if st.button("🚀 Crear mi Cuenta y Jugar", use_container_width=True):
-            datos = cargar_datos()
+            datos = cargar_datos()  # Recargar datos para evitar sobreescritura diferida
             if codigo_ticket in datos.get("codigos_registro", {}):
                 if datos["codigos_registro"][codigo_ticket]["usado"]:
                     st.error("❌ Este código ya fue utilizado.")
@@ -78,24 +85,27 @@ if st.session_state["usuario_logueado"] is None:
                 elif nuevo_apodo == "" or nuevo_password == "":
                     st.error("⚠️ Rellena todos los campos.")
                 else:
+                    # Guardar el perfil completo de forma limpia
                     datos["usuarios"][nuevo_apodo] = {"password": nuevo_password, "puntos": 0, "activo": True}
                     datos["codigos_registro"][codigo_ticket]["usado"] = True
                     datos["codigos_registro"][codigo_ticket]["por_usuario"] = nuevo_apodo
                     guardar_datos(datos)
                     st.session_state["usuario_logueado"] = nuevo_apodo
-                    st.query_params.clear()
+                    st.query_params.clear()  # Limpiar la URL de la barra de direcciones
                     st.rerun()
-            else: st.error("❌ Código inválido.")
+            else: 
+                st.error("❌ Código inválido.")
 
-# --- PÁGINA PRINCIPAL DE JUEGO (SI YA LOGUEÓ) ---
+# --- SECCIÓN 2: PÁGINA PRINCIPAL DE JUEGO (LOGUEADO) ---
 else:
     apodo_usuario = st.session_state["usuario_logueado"]
     
+    # Barra superior con la información del perfil del jugador
     col_inf, col_btn = st.columns(2)
     with col_inf:
         st.write(f"👤 Usuario: **{apodo_usuario}**")
     with col_btn:
-        if st.button("❌ Salir", use_container_width=True):
+        if st.button("❌ Salir de la Cuenta", use_container_width=True):
             st.session_state["usuario_logueado"] = None
             st.rerun()
             
@@ -111,15 +121,15 @@ else:
         
         st.subheader(f"🗓️ {equipo_local} vs {equipo_visitante}")
         
-        # 🛡️ MEJORA: El candado ahora se activa por el Admin o si pasó la fecha inaugural
+        # --- CANDADO DE SEGURIDAD AUTOMÁTICO ---
         zona_mex = zoneinfo.ZoneInfo("America/Mexico_City")
         hora_actual_mex = datetime.now(zona_mex)
         hora_limite_partido = datetime(2026, 6, 11, 13, 0, 0, tzinfo=zona_mex)
         
-        # Se bloquea si el admin marcó 'finalizado' o si pasó la hora del primer juego
+        # Se bloquea si el Admin ya cerró el partido o si pasó la hora del juego inaugural
         partido_comenzado = (datos["partido_actual"].get("estado") == "finalizado") or (hora_actual_mex >= hora_limite_partido)
 
-        # Cargar valores guardados previamente por el usuario para que no aparezcan en 0 siempre
+        # Cargar valores guardados previamente por este usuario concreto
         pronostico_previo = datos.get("pronosticos", {}).get(apodo_usuario, {"local": 0, "visitante": 0})
 
         col1, col2, col3 = st.columns(3)
@@ -134,7 +144,7 @@ else:
         
         st.divider()
         
-        # --- TABLA INFORMATIVA DE REGLAS DE PUNTOS ---
+        # Pestaña interactiva desplegable con las reglas de puntuación oficiales
         with st.expander("🎯 Ver Sistema de Puntuación Oficial"):
             st.markdown("""
             * **1 Punto:** Acertar Empate sin marcador exacto.
@@ -147,7 +157,7 @@ else:
             st.error("🔒 Los pronósticos para este encuentro están oficialmente CERRADOS.")
         else:
             if st.button("💾 Guardar mi Pronóstico", use_container_width=True):
-                datos = cargar_datos()
+                datos = cargar_datos()  # Recarga preventiva antes de escribir para no chocar datos
                 
                 datos["pronosticos"][apodo_usuario] = {
                     "local": goles_local, 
@@ -155,14 +165,14 @@ else:
                 }
                 
                 guardar_datos(datos)
-                st.success("¡Tu pronóstico ha sido guardados con éxito!")
+                st.success("¡Tu pronóstico ha sido guardado con éxito!")
 
     with pestana_ranking:
-        st.subheader("🔝 Top Jugadores del Mundial")
+        st.subheader("🔝 Top Jugadores de la Quiniela")
         datos = cargar_datos()
         
-        # 📊 MEJORA: Ordenamos la lista de usuarios de mayor a menor puntaje antes de mostrar la tabla
-        usuarios_ordenados = sorted(datos["usuarios"].items(), key=lambda x: x[1]["puntos"], reverse=True)
+        # Ordenación estricta por puntos en formato descendente
+        usuarios_ordenados = sorted(datos["usuarios"].items(), key=lambda x: x["puntos"], reverse=True)
         
         datos_tabla = [
             {
@@ -175,4 +185,4 @@ else:
         if datos_tabla:
             st.table(datos_tabla)
         else:
-            st.info("Aún no hay usuarios registrados en la tabla.")
+            st.info("Aún no hay usuarios registrados en la tabla de posiciones.")
