@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 import zoneinfo
 
+# Configuración adaptable para pantallas de celulares
 st.set_page_config(page_title="Quiniela Mundial 2026", layout="centered")
 
 def cargar_datos():
@@ -47,7 +48,7 @@ if st.session_state["usuario_logueado"] is None:
         
         if st.button("🚪 Entrar", use_container_width=True):
             if apodo_ingresado in datos["usuarios"]:
-                # 🔒 Validación de suspensión
+                # Validación de suspensión administrada
                 if not datos["usuarios"][apodo_ingresado].get("activo", True):
                     st.error("❌ Tu cuenta se encuentra suspendida temporalmente por el Administrador.")
                 elif password_ingresado == datos["usuarios"][apodo_ingresado]["password"]:
@@ -60,7 +61,16 @@ if st.session_state["usuario_logueado"] is None:
         st.subheader("Crear Cuenta de Invitado")
         codigo_sucio = st.text_input("Código de Invitación:", value=codigo_desde_enlace)
         
-        codigo_ticket = codigo_sucio.split("?invitacion=")[-1].strip().upper() if "?invitacion=" in codigo_sucio else codigo_sucio.strip().upper()
+        # Limpieza de URL
+        if "?invitacion=" in codigo_sucio:
+            codigo_ticket = codigo_sucio.split("?invitacion=")[-1].strip().upper()
+        else:
+            codigo_ticket = codigo_sucio.strip().upper()
+        
+        # 🧠 ARREGLO AUTOMÁTICO DEL CÓDIGO INVÁLIDO: Si no escriben "MUN-", se lo ponemos solo
+        if codigo_ticket != "" and not codigo_ticket.startswith("MUN-"):
+            codigo_ticket = f"MUN-{codigo_ticket}"
+        
         nuevo_apodo = st.text_input("Inventa tu Apodo Público:").strip()
         nuevo_password = st.text_input("Inventa tu Contraseña Secreta:", type="password")
         
@@ -141,7 +151,7 @@ else:
         st.subheader("🔝 Top Jugadores del Mundial")
         datos = cargar_datos()
         
-        # 🔥 SOLUCIÓN DEFINITIVA AL TYPEERROR (Uso correcto de x[1]['puntos'])
+        # Corrección del TypeError para ordenar de manera correcta usando x[1]["puntos"]
         usuarios_ordenados = sorted(datos["usuarios"].items(), key=lambda x: x[1]["puntos"], reverse=True)
         
         datos_tabla = [

@@ -3,6 +3,7 @@ import json
 import random
 import string
 
+# Configuración limpia para pantallas de celular
 st.set_page_config(page_title="Panel Administrador", layout="centered")
 
 # --- MANEJO SEGURO DE ARCHIVOS Y JSON ---
@@ -13,6 +14,7 @@ def cargar_datos():
     except (FileNotFoundError, json.JSONDecodeError):
         datos = {}
     
+    # Asegura la consistencia de las estructuras obligatorias
     if "partido_actual" not in datos:
         datos["partido_actual"] = {"local": "México", "visitante": "Sudáfrica", "estado": "activo"}
     if "codigos_registro" not in datos:
@@ -41,6 +43,7 @@ def calcular_puntos(gol_u_local, gol_u_vis, gol_r_local, gol_r_vis):
     else:
         return 0
 
+# Inicialización
 datos = cargar_datos()
 
 st.title("⚙️ Panel de Control - Administrador")
@@ -117,7 +120,7 @@ with pestana_invitaciones:
 # --- PESTAÑA 3: GESTIÓN DE USUARIOS Y RANKING ---
 with pestana_usuarios:
     st.subheader("📊 Tabla de Posiciones General")
-    # 🔥 SOLUCIÓN DEFINITIVA AL TYPEERROR (Uso correcto de x[1]['puntos'])
+    # Corrección del TypeError para ordenar de manera correcta usando x[1]["puntos"]
     usuarios_ordenados = sorted(datos["usuarios"].items(), key=lambda x: x[1]["puntos"], reverse=True)
     
     datos_tabla = [
